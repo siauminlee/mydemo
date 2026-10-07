@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1-3 大自然的水循環 - 互動拖拉配對遊戲</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif, system-ui;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Glassmorphism effects */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(8px);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+        }
+
+        /* Dragging Tag Card Styling */
+        .tag-card {
+            transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s ease, opacity 0.15s ease;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .tag-card:active {
+            cursor: grabbing;
+        }
+
+        .tag-card.is-dragging {
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+
+        /* Floating Drag Avatar */
+        #drag-avatar {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%) scale(1.08);
+            box-shadow: 0 14px 28px rgba(245, 158, 11, 0.4), 0 10px 10px rgba(0, 0, 0, 0.15);
+            transition: transform 0.05s linear;
+        }
+
+        /* Drop Zone Styles */
+        .drop-zone {
+            transition: all 0.25s ease;
+        }
+
+        .drop-zone.drag-over {
+            transform: scale(1.08);
+            border-color: #10B981 !important;
+            background-color: rgba(209, 250, 229, 0.95) !important;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.6);
+        }
+
+        .drop-zone.has-item {
+            border-style: solid !important;
+            border-color: #F59E0B !important;
+            background-color: rgba(254, 243, 199, 0.9) !important;
+        }
+
+        .drop-zone.correct-zone {
+            border-color: #10B981 !important;
+            background-color: #D1FAE5 !important;
+        }
+
+        .drop-zone.wrong-zone {
+            border-color: #EF4444 !important;
+            background-color: #FEE2E2 !important;
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+        }
+
+        .pulse-target {
+            animation: pulse-glow 2s infinite;
+        }
+
+        /* Custom Scrollbar for Tag Pool */
+        ::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 min-h-screen text-slate-800 flex flex-col justify-between overflow-x-hidden">
+
+    <!-- Top Header -->
+    <header class="w-full bg-white/80 backdrop-blur-md border-b border-sky-200 px-4 py-3 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <span class="bg-amber-500 text-white font-black text-xs md:text-sm px-3 py-1 rounded-full shadow">
+                    國小自然 1-3
+                </span>
+                <h1 class="text-lg md:text-2xl font-black text-sky-900 flex items-center gap-2">
+                    <i class="fa-solid font-bold fa-water text-sky-500"></i>
+                    大自然的水循環 互動配對
+                </h1>
+            </div>
+
+            <!-- Action Control Buttons -->
+            <div class="flex items-center gap-2 md:gap-3">
+                <button id="btn-info" class="bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs md:text-sm transition flex items-center gap-1.5 shadow-sm border border-sky-300">
+                    <i class="fa-solid fa-circle-info text-sky-600"></i>
+                    <span>名詞小知識</span>
+                </button>
+                <button id="btn-reset" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs md:text-sm transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>重新開始</span>
+                </button>
+                <button id="btn-check" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black px-4 py-1.5 md:px-5 md:py-2 rounded-xl text-xs md:text-sm shadow-md hover:shadow-lg transition flex items-center gap-1.5 active:scale-95">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>檢查答案</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Interactive Workspace -->
+    <main class="max-w-7xl w-full mx-auto p-2 sm:p-4 flex-1 flex flex-col gap-4">
+
+        <!-- Diagram & Drop Zone Canvas Container -->
+        <div class="relative w-full bg-sky-200/50 rounded-3xl p-1 md:p-3 shadow-xl border-4 border-white overflow-hidden glass-panel">
+            
+            <!-- Dynamic Vector SVG Landscape -->
+            <div class="relative w-full aspect-[16/9] md:aspect-[21/10] min-h-[380px] sm:min-h-[460px] rounded-2xl overflow-hidden bg-sky-300 shadow-inner">
+                <svg viewBox="0 0 1000 580" class="w-full h-full object-cover select-none">
+                    <defs>
+                        <!-- Gradients -->
+                        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#38bdf8"/>
+                            <stop offset="60%" stop-color="#bae6fd"/>
+                            <stop offset="100%" stop-color="#e0f2fe"/>
+                        </linearGradient>
+
+                        <linearGradient id="seaGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="#0284c7"/>
+                            <stop offset="100%" stop-color="#06b6d4"/>
+                        </linearGradient>
+
+                        <linearGradient id="mountainGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#65a30d"/>
+                            <stop offset="100%" stop-color="#15803d"/>
+                        </linearGradient>
+
+                        <linearGradient id="highMountainGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#94a3b8"/>
+                            <stop offset="100%" stop-color="#475569"/>
+                        </linearGradient>
+
+                        <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#d97706"/>
+                            <stop offset="50%" stop-color="#b45309"/>
+                            <stop offset="100%" stop-color="#78350f"/>
+                        </linearGradient>
+
+                        <linearGradient id="aquiferGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#ca8a04"/>
+                            <stop offset="100%" stop-color="#854d0e"/>
+                        </linearGradient>
+
+                        <!-- Arrow Marker -->
+                        <marker id="red-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M 0 1 L 10 5 L 0 9 z" fill="#ef4444"/>
+                        </marker>
+                        <marker id="blue-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 10 5 L 0 9 z" fill="#0284c7"/>
+                        </marker>
+                    </defs>
+
+                    <!-- Background Sky -->
+                    <rect width="1000" height="580" fill="url(#skyGrad)"/>
+
+                    <!-- Sun with Glow -->
+                    <circle cx="85" cy="75" r="45" fill="#fde047" opacity="0.9"/>
+                    <circle cx="85" cy="75" r="58" fill="#fef08a" opacity="0.4"/>
+
+                    <!-- Ocean / Sea on Left -->
+                    <path d="M 0 380 Q 150 370 250 400 L 250 580 L 0 580 Z" fill="url(#seaGrad)"/>
+                    <path d="M 0 388 C 60 382 120 395 180 390 C 220 387 240 398 250 400 L 250 580 L 0 580 Z" fill="#0ea5e9" opacity="0.5"/>
+
+                    <!-- Ground / Soil / Rocks Base -->
+                    <path d="M 245 400 L 1000 400 L 1000 580 L 245 580 Z" fill="url(#groundGrad)"/>
+                    
+                    <!-- Aquifer Underground Water Layer (地層/地下水) -->
+                    <path d="M 245 470 Q 550 460 1000 450 L 1000 540 Q 550 550 245 560 Z" fill="url(#aquiferGrad)"/>
+                    <!-- Underground Water Flow Path -->
+                    <path d="M 980 495 C 750 505 500 510 250 515" fill="none" stroke="#38bdf8" stroke-width="12" stroke-dasharray="8 4" opacity="0.8"/>
+                    <path d="M 980 495 C 750 505 500 510 250 515" fill="none" stroke="#0284c7" stroke-width="3" marker-start="url(#blue-arrow)"/>
+                    <text x="560" y="535" fill="#fef08a" font-weight="bold" font-size="14">地下水層 (自由地下水 / 受壓地下水)</text>
+
+                    <!-- Mountains -->
+                    <!-- High Snowy Peak Right -->
+                    <polygon points="620,400 820,120 1000,400" fill="url(#highMountainGrad)"/>
+                    <!-- Snow Cap -->
+                    <polygon points="765,195 820,120 870,195 840,210 820,190 795,210" fill="#f8fafc"/>
+
+                    <!-- Mid Green Mountains Center -->
+                    <polygon points="380,400 560,180 720,400" fill="url(#mountainGrad)"/>
+                    <polygon points="220,400 380,240 500,400" fill="#22c55e" opacity="0.85"/>
+
+                    <!-- Forest / Trees on Hill -->
+                    <g fill="#15803d">
+                        <!-- Cluster 1 -->
+                        <circle cx="410" cy="350" r="16"/><circle cx="425" cy="340" r="20"/><circle cx="440" cy="352" r="16"/>
+                        <rect x="421" y="358" width="7" height="15" fill="#78350f"/>
+                        <!-- Cluster 2 -->
+                        <circle cx="460" cy="360" r="18"/><circle cx="480" cy="350" r="22"/><circle cx="498" cy="362" r="17"/>
+                        <rect x="476" y="368" width="8" height="16" fill="#78350f"/>
+                    </g>
+
+                    <!-- River flowing down mountain into ocean -->
+                    <path d="M 780 240 Q 680 290 620 340 T 420 390 T 250 410" fill="none" stroke="#38bdf8" stroke-width="22" stroke-linecap="round"/>
+                    <path d="M 780 240 Q 680 290 620 340 T 420 390 T 250 410" fill="none" stroke="#e0f2fe" stroke-width="4" stroke-dasharray="10 6"/>
+
+                    <!-- Clouds -->
+                    <!-- Cloud 1 (Left - Condensation Cloud) -->
+                    <g fill="#ffffff" opacity="0.95">
+                        <path d="M 280 130 A 30 30 0 0 1 330 110 A 40 40 0 0 1 400 120 A 30 30 0 0 1 430 140 A 25 25 0 0 1 410 170 L 290 170 A 25 25 0 0 1 280 130 Z"/>
+                    </g>
+                    
+                    <!-- Cloud 2 (Center - Rain Cloud) -->
+                    <g fill="#94a3b8" opacity="0.9">
+                        <path d="M 520 120 A 35 35 0 0 1 580 95 A 45 45 0 0 1 650 110 A 35 35 0 0 1 680 135 A 30 30 0 0 1 660 170 L 530 170 A 30 30 0 0 1 520 120 Z"/>
+                        <!-- Rain Drops -->
+                        <path d="M 550 185 L 542 205 M 580 185 L 572 205 M 610 185 L 602 205 M 640 185 L 632 205" stroke="#0284c7" stroke-width="3.5" stroke-linecap="round"/>
+                    </g>
+
+                    <!-- Cloud 3 (Right - Snow Cloud) -->
+                    <g fill="#cbd5e1" opacity="0.95">
+                        <path d="M 750 100 A 30 30 0 0 1 800 85 A 38 38 0 0 1 860 98 A 30 30 0 0 1 880 120 A 25 25 0 0 1 860 150 L 760 150 A 25 25 0 0 1 750 100 Z"/>
+                        <!-- Snowflakes -->
+                        <text x="765" y="175" fill="#ffffff" font-size="16" font-weight="bold">❄</text>
+                        <text x="805" y="180" fill="#ffffff" font-size="16" font-weight="bold">❄</text>
+                        <text x="845" y="172" fill="#ffffff" font-size="16" font-weight="bold">❄</text>
+                    </g>
+
+                    <!-- Flow Arrows (Red Guidance Arrows) -->
+                    <!-- 1. Evaporation Arrow (Ocean -> Atmosphere) -->
+                    <path d="M 140 370 Q 150 280 180 230" fill="none" stroke="#ef4444" stroke-width="5" stroke-dasharray="6 4" marker-end="url(#red-arrow)"/>
+                    
+                    <!-- 2. Transpiration Arrow (Trees -> Atmosphere) -->
+                    <path d="M 450 330 Q 455 270 470 230" fill="none" stroke="#ef4444" stroke-width="5" stroke-dasharray="6 4" marker-end="url(#red-arrow)"/>
+
+                    <!-- 3. Condensation / Wind Movement Arrow -->
+                    <path d="M 420 110 Q 470 90 510 100" fill="none" stroke="#ef4444" stroke-width="5" marker-end="url(#red-arrow)"/>
+                    
+                    <!-- 4. Cloud Movement to Snow Peak Arrow -->
+                    <path d="M 680 110 Q 710 90 740 95" fill="none" stroke="#ef4444" stroke-width="5" marker-end="url(#red-arrow)"/>
+
+                    <!-- 5. Rain Falling Arrow -->
+                    <path d="M 590 205 L 590 260" fill="none" stroke="#ef4444" stroke-width="5" marker-end="url(#red-arrow)"/>
+
+                    <!-- 6. Snow Falling / Melting Arrow -->
+                    <path d="M 820 220 L 820 270" fill="none" stroke="#ef4444" stroke-width="5" marker-end="url(#red-arrow)"/>
+
+                    <!-- 7. Runoff / River Collection Arrow -->
+                    <path d="M 610 360 C 520 395 400 405 280 415" fill="none" stroke="#ef4444" stroke-width="6" marker-end="url(#red-arrow)"/>
+
+                    <!-- 8. Infiltration Arrow (Rain/River -> Ground) -->
+                    <path d="M 630 400 L 630 450" fill="none" stroke="#ef4444" stroke-width="5" stroke-dasharray="5 3" marker-end="url(#red-arrow)"/>
+                </svg>
+
+                <!-- Absolute Positioned Interactive Drop Zones Overlay -->
+                <!-- 1. Condensation / Deposition (凝結、凝華) - Clouds -->
+                <div class="drop-zone absolute top-[8%] left-[27%] w-[21%] h-[12%] min-w-[110px] min-h-[46px] border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target" data-target="凝結、凝華">
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i>放置區：雲的形成
+                    </span>
+                </div>
+
+                <!-- 2. Rain Precipitation (降水) -->
+                <div class="drop-zone absolute top-[13%] left-[51%] w-[19%] h-[12%] min-w-[110px] min-h-[46px] border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target" data-target="降水">
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid fa-cloud-rain mr-1"></i>放置區：雨、雹
+                    </span>
+                </div>
+
+                <!-- 3. Snowfall (降雪) -->
+                <div class="drop-zone absolute top-[10%] left-[73%] w-[19%] h-[12%] min-w-[110px] min-h-[46px] border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target" data-target="降雪">
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid fa-snowflake mr-1"></i>放置區：降雪
+                    </span>
+                </div>
+
+                <!-- 4. Evaporation (蒸發) - Ocean -->
+                <div class="drop-zone absolute top-[52%] left-[4%] w-[20%] h-[12%] min-w-[110px] min-h-[46px] border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target" data-target="蒸發">
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid fa-water mr-1"></i>放置區：水蒸發
+                    </span>
+                </div>
+
+                <!-- 5. Transpiration (蒸散) - Plants/Trees -->
+                <div class="drop-zone absolute top-[44%] left-[34%] w-[20%] h-[12%] min-w-[110px] min-h-[46px] border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target" data-target="蒸散">
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid fa-tree mr-1"></i>放置區：植物蒸散
+                    </span>
+                </div>
+
+                <!-- 6. Snow Melting (融化) - Snow Mountain Runoff -->
+                <div class="drop-zone absolute top-[36%] left-[75%] w-[19%] h-[12%] min-w-[110px] min-h-[46px] border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target" data-target="融化">
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid fa-temperature-arrow-up mr-1"></i>放置區：積雪融化
+                    </span>
+                </div>
+
+                <!-- 7. Collection (匯集) - River Stream Flow -->
+                <div class="drop-zone absolute top-[62%] left-[48%] w-[21%] h-[12%] min-w-[110px] min-h-[46px] border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target" data-target="匯集">
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid fa-route mr-1"></i>放置區：水匯集
+                    </span>
+                </div>
+
+                <!-- 8. Infiltration (滲入地層) - Soil Aquifer -->
+                <div class="drop-zone absolute top-[74%] left-[72%] w-[22%] h-[12%] min-w-[110px] min-h-[46px] border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target" data-target="滲入地層">
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid fa-arrow-down-long mr-1"></i>放置區：滲入土壤
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Tag Pool Container -->
+        <div class="w-full bg-white/90 rounded-2xl p-3 sm:p-4 shadow-lg border border-amber-200 glass-panel">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-xs sm:text-sm font-bold text-amber-900 flex items-center gap-1.5">
+                    <i class="fa-solid fa-hand-pointer text-amber-500 animate-bounce"></i>
+                    <span>請將下方橘黃色名詞標籤拖曳至上方地圖對應的位置：</span>
+                </h2>
+                <span id="progress-counter" class="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-300">
+                    已放置: 0 / 8
+                </span>
+            </div>
+
+            <!-- Tag Bank Area -->
+            <div id="tag-pool" class="min-h-[70px] bg-amber-50/60 rounded-xl p-2.5 border-2 border-dashed border-amber-300 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 transition-all">
+                <!-- Tags will be rendered dynamically here -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Noun Definitions Modal -->
+    <div id="modal-info" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border-4 border-sky-300 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 class="text-xl font-black text-sky-900 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-sky-500"></i>
+                    1-3 水循環重點小知識
+                </h3>
+                <button class="close-modal text-slate-400 hover:text-slate-600 text-2xl font-bold p-1">×</button>
+            </div>
+            
+            <div id="info-list" class="my-4 overflow-y-auto space-y-3 pr-1 text-sm sm:text-base">
+                <!-- Dynamic Item Descriptions inserted via JS -->
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 text-right">
+                <button class="close-modal bg-sky-500 hover:bg-sky-600 text-white font-bold px-6 py-2 rounded-xl shadow transition">
+                    知道了！
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Celebration Modal -->
+    <div id="modal-victory" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl border-4 border-amber-400 transform scale-90 animate-bounce-in">
+            <div class="text-6xl mb-2">🎉</div>
+            <h3 class="text-2xl font-black text-amber-600 mb-1">恭喜答對！大滿貫！</h3>
+            <p class="text-slate-600 font-bold mb-4">你已經完全掌握「水循環」的各個階段了！</p>
+            
+            <!-- Rating Stars -->
+            <div class="flex justify-center gap-2 text-3xl text-amber-400 mb-6" id="star-rating">
+                <i class="fa-solid fa-star animate-pulse"></i>
+                <i class="fa-solid fa-star animate-pulse delay-100"></i>
+                <i class="fa-solid fa-star animate-pulse delay-200"></i>
+            </div>
+
+            <div class="flex justify-center gap-3">
+                <button id="btn-restart-victory" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black px-6 py-2.5 rounded-xl shadow-lg transition transform active:scale-95">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> 再玩一次
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas for Confetti Fireworks -->
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50"></canvas>
+
+    <!-- Floating Avatar Drag Proxy Element -->
+    <div id="drag-avatar" class="hidden font-black text-white px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-sm shadow-xl border-2 border-white">
+        <!-- Text set dynamically -->
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-2 text-xs text-slate-500 font-bold">
+        國小自然與生活科技 課本單元 1-3 「大自然的水循環」數位互動教材
+    </footer>
+
+    <script>
+        // Water Cycle Matching Items Data Definitions
+        const WATER_CYCLE_ITEMS = [
+            {
+                id: "item-1",
+                name: "蒸發",
+                desc: "地表水或海洋受熱變為水蒸氣上升到空氣中。",
+                icon: "fa-water"
+            },
+            {
+                id: "item-2",
+                name: "蒸散",
+                desc: "植物根部吸收水分後，經由葉片散失為水蒸氣。",
+                icon: "fa-tree"
+            },
+            {
+                id: "item-3",
+                name: "凝結、凝華",
+                desc: "水蒸氣遇冷降溫形成小水滴或微小冰晶（聚集成雲或霧）。",
+                icon: "fa-cloud"
+            },
+            {
+                id: "item-4",
+                name: "降水",
+                desc: "雲中的小水滴或冰晶合併變大重到無法懸浮，受重力落到地面（雨、雹）。",
+                icon: "fa-cloud-showers-heavy"
+            },
+            {
+                id: "item-5",
+                name: "降雪",
+                desc: "高空冰晶降落過程中沒有融化，直接掉落到地面（雪）。",
+                icon: "fa-snowflake"
+            },
+            {
+                id: "item-6",
+                name: "融化",
+                desc: "高山或寒冷地區的積雪冰川受熱融化成液態水。",
+                icon: "fa-temperature-arrow-up"
+            },
+            {
+                id: "item-7",
+                name: "滲入地層",
+                desc: "雨水或地表水滲入土壤與岩層孔隙，形成地下水。",
+                icon: "fa-arrow-down-short-wide"
+            },
+            {
+                id: "item-8",
+                name: "匯集",
+                desc: "地表水與地下水沿地勢匯流進入溪流、河流與海洋。",
+                icon: "fa-route"
+            }
+        ];
+
+        // Sound Effects Synthesizer (Web Audio API)
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            playPop() {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
+            }
+            playSnap() {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+            playSuccess() {
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+                    gain.gain.setValueAtTime(0.25, now + idx * 0.09);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.09);
+                    osc.stop(now + idx * 0.09 + 0.3);
+                });
+            }
+            playError() {
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.setValueAtTime(160, now + 0.15);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+        }
+
+        const soundFX = new SoundFX();
+
+        // Game State Variables
+        let state = {
+            placedMap: {}, // dropZoneTarget -> itemName
+            activeDragTag: null,
+            activeDropZone: null,
+            dragAvatarEl: null
+        };
+
+        // DOM Elements
+        const tagPoolEl = document.getElementById('tag-pool');
+        const dropZoneEls = document.querySelectorAll('.drop-zone');
+        const dragAvatar = document.getElementById('drag-avatar');
+        const progressCounter = document.getElementById('progress-counter');
+        const modalInfo = document.getElementById('modal-info');
+        const infoList = document.getElementById('info-list');
+        const modalVictory = document.getElementById('modal-victory');
+
+        // Shuffle Array Helper
+        function shuffle(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        // Initialize / Render Info Modal List
+        function renderInfoList() {
+            infoList.innerHTML = WATER_CYCLE_ITEMS.map(item => `
+                <div class="p-3 rounded-2xl bg-sky-50 border border-sky-200 flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0 shadow">
+                        <i class="fa-solid ${item.icon}"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-black text-sky-900 text-base mb-0.5">${item.name}</h4>
+                        <p class="text-slate-600 text-xs sm:text-sm font-bold leading-relaxed">${item.desc}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Create Tag Card Element
+        function createTagCard(item) {
+            const card = document.createElement('div');
+            card.className = 'tag-card bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-black px-3.5 py-2 rounded-xl text-xs sm:text-sm shadow-md border-2 border-amber-200/80 flex items-center gap-1.5 cursor-grab select-none active:scale-95';
+            card.dataset.name = item.name;
+            card.dataset.id = item.id;
+            
+            card.innerHTML = `
+                <i class="fa-solid ${item.icon} text-amber-100 pointer-events-none"></i>
+                <span class="pointer-events-none">${item.name}</span>
+            `;
+
+            attachPointerDragListeners(card);
+            return card;
+        }
+
+        // Initialize Game Board
+        function initGame() {
+            state.placedMap = {};
+            state.activeDragTag = null;
+            state.activeDropZone = null;
+
+            // Clear Tag Pool
+            tagPoolEl.innerHTML = '';
+
+            // Reset Drop Zones
+            dropZoneEls.forEach(zone => {
+                zone.className = 'drop-zone absolute border-2 border-dashed border-amber-500 bg-white/70 rounded-xl flex items-center justify-center p-1 text-center shadow-md transition-all cursor-pointer pulse-target';
+                const targetName = zone.dataset.target;
+                
+                // Reset placeholder icon text
+                let hintIcon = "fa-location-dot";
+                if(targetName.includes("凝結")) hintIcon = "fa-cloud-arrow-up";
+                else if(targetName.includes("降水")) hintIcon = "fa-cloud-rain";
+                else if(targetName.includes("降雪")) hintIcon = "fa-snowflake";
+                else if(targetName.includes("蒸發")) hintIcon = "fa-water";
+                else if(targetName.includes("蒸散")) hintIcon = "fa-tree";
+                else if(targetName.includes("融化")) hintIcon = "fa-temperature-arrow-up";
+                else if(targetName.includes("匯集")) hintIcon = "fa-route";
+                else if(targetName.includes("滲入")) hintIcon = "fa-arrow-down-long";
+
+                zone.innerHTML = `
+                    <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                        <i class="fa-solid ${hintIcon} mr-1"></i>${targetName}
+                    </span>
+                `;
+            });
+
+            // Shuffle and insert tags into pool
+            const shuffledItems = shuffle(WATER_CYCLE_ITEMS);
+            shuffledItems.forEach(item => {
+                const tagEl = createTagCard(item);
+                tagPoolEl.appendChild(tagEl);
+            });
+
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const count = Object.keys(state.placedMap).length;
+            progressCounter.textContent = `已放置: ${count} / 8`;
+        }
+
+        let touchDragState = {
+            isDragging: false,
+            draggedEl: null,
+            targetName: '',
+            offsetX: 0,
+            offsetY: 0
+        };
+
+        function attachPointerDragListeners(el) {
+            el.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                soundFX.playPop();
+
+                touchDragState.isDragging = true;
+                touchDragState.draggedEl = el;
+                touchDragState.targetName = el.dataset.name;
+
+                // Setup Avatar
+                dragAvatar.innerHTML = el.innerHTML;
+                dragAvatar.classList.remove('hidden');
+                dragAvatar.style.left = `${e.clientX}px`;
+                dragAvatar.style.top = `${e.clientY}px`;
+
+                el.classList.add('is-dragging');
+
+                // Capture Pointer
+                el.setPointerCapture(e.pointerId);
+            });
+
+            el.addEventListener('pointermove', (e) => {
+                if (!touchDragState.isDragging) return;
+
+                dragAvatar.style.left = `${e.clientX}px`;
+                dragAvatar.style.top = `${e.clientY}px`;
+
+                // Detect element under pointer
+                dragAvatar.style.display = 'none';
+                const elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                dragAvatar.style.display = 'flex';
+
+                const closestZone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+
+                // Highlight hover drop zone
+                dropZoneEls.forEach(zone => {
+                    if (zone === closestZone) {
+                        zone.classList.add('drag-over');
+                    } else {
+                        zone.classList.remove('drag-over');
+                    }
+                });
+            });
+
+            const handleDragEnd = (e) => {
+                if (!touchDragState.isDragging) return;
+                touchDragState.isDragging = false;
+
+                el.classList.remove('is-dragging');
+                dragAvatar.classList.add('hidden');
+
+                // Find element below drop coordinate
+                dragAvatar.style.display = 'none';
+                const elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                dragAvatar.style.display = 'flex';
+
+                const dropZone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+
+                // Clear all drag-over visual highlights
+                dropZoneEls.forEach(z => z.classList.remove('drag-over'));
+
+                if (dropZone) {
+                    handleDropOnZone(el, dropZone);
+                } else {
+                    // Dropped in empty space / pool -> Return to pool smoothly
+                    returnToPool(el);
+                }
+
+                try { el.releasePointerCapture(e.pointerId); } catch(err) {}
+            };
+
+            el.addEventListener('pointerup', handleDragEnd);
+            el.addEventListener('pointercancel', handleDragEnd);
+        }
+
+        function handleDropOnZone(tagEl, zoneEl) {
+            const targetZoneName = zoneEl.dataset.target;
+            const tagName = tagEl.dataset.name;
+
+            soundFX.playSnap();
+
+            // Check if zone already contains an existing tag
+            const existingTag = zoneEl.querySelector('.tag-card');
+            if (existingTag && existingTag !== tagEl) {
+                // Return old tag back to pool (防呆機制：被替代的標籤退回標籤池)
+                returnToPool(existingTag);
+            }
+
+            // Remove tag from previous zone record if moving from another zone
+            for (const zName in state.placedMap) {
+                if (state.placedMap[zName] === tagName) {
+                    delete state.placedMap[zName];
+                }
+            }
+
+            // Place new tag inside zone
+            zoneEl.innerHTML = '';
+            zoneEl.appendChild(tagEl);
+            zoneEl.classList.add('has-item');
+            zoneEl.classList.remove('pulse-target', 'correct-zone', 'wrong-zone');
+
+            // Record state
+            state.placedMap[targetZoneName] = tagName;
+            updateProgress();
+        }
+
+        function returnToPool(tagEl) {
+            const tagName = tagEl.dataset.name;
+            
+            // Remove from state mapping
+            for (const zName in state.placedMap) {
+                if (state.placedMap[zName] === tagName) {
+                    delete state.placedMap[zName];
+                    
+                    // Reset zone placeholder UI
+                    const oldZone = Array.from(dropZoneEls).find(z => z.dataset.target === zName);
+                    if (oldZone) {
+                        oldZone.classList.remove('has-item', 'correct-zone', 'wrong-zone');
+                        oldZone.classList.add('pulse-target');
+                        
+                        let hintIcon = "fa-location-dot";
+                        if(zName.includes("凝結")) hintIcon = "fa-cloud-arrow-up";
+                        else if(zName.includes("降水")) hintIcon = "fa-cloud-rain";
+                        else if(zName.includes("降雪")) hintIcon = "fa-snowflake";
+                        else if(zName.includes("蒸發")) hintIcon = "fa-water";
+                        else if(zName.includes("蒸散")) hintIcon = "fa-tree";
+                        else if(zName.includes("融化")) hintIcon = "fa-temperature-arrow-up";
+                        else if(zName.includes("匯集")) hintIcon = "fa-route";
+                        else if(zName.includes("滲入")) hintIcon = "fa-arrow-down-long";
+
+                        oldZone.innerHTML = `
+                            <span class="placeholder-text text-amber-800 text-[11px] sm:text-xs font-bold pointer-events-none">
+                                <i class="fa-solid ${hintIcon} mr-1"></i>${zName}
+                            </span>
+                        `;
+                    }
+                }
+            }
+
+            // Append back to pool
+            tagPoolEl.appendChild(tagEl);
+            updateProgress();
+        }
+
+        function checkAnswers() {
+            let correctCount = 0;
+            let totalSlots = dropZoneEls.length;
+
+            dropZoneEls.forEach(zone => {
+                const targetName = zone.dataset.target;
+                const currentTag = zone.querySelector('.tag-card');
+
+                if (currentTag) {
+                    const tagName = currentTag.dataset.name;
+                    if (tagName === targetName) {
+                        // Correct match!
+                        correctCount++;
+                        zone.classList.remove('wrong-zone');
+                        zone.classList.add('correct-zone');
+                    } else {
+                        // Wrong match!
+                        zone.classList.remove('correct-zone');
+                        zone.classList.add('wrong-zone');
+                    }
+                } else {
+                    // Empty drop zone
+                    zone.classList.remove('correct-zone');
+                    zone.classList.add('wrong-zone');
+                }
+            });
+
+            if (correctCount === totalSlots) {
+                // All correct! Victory!
+                soundFX.playSuccess();
+                launchConfetti();
+                setTimeout(() => {
+                    modalVictory.classList.remove('hidden');
+                }, 400);
+            } else {
+                // Some errors
+                soundFX.playError();
+            }
+        }
+
+        // Confetti Fireworks Engine
+        function launchConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            const colors = ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#facc15'];
+
+            for (let i = 0; i < 120; i++) {
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    vx: (Math.random() - 0.5) * 18,
+                    vy: (Math.random() - 0.7) * 18,
+                    size: Math.random() * 8 + 4,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    rotation: Math.random() * 360,
+                    rSpeed: (Math.random() - 0.5) * 10,
+                    opacity: 1
+                });
+            }
+
+            let animationFrame;
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let alive = false;
+
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.3; // Gravity
+                    p.rotation += p.rSpeed;
+                    p.opacity -= 0.012;
+
+                    if (p.opacity > 0) {
+                        alive = true;
+                        ctx.save();
+                        ctx.translate(p.x, p.y);
+                        ctx.rotate((p.rotation * Math.PI) / 180);
+                        ctx.globalAlpha = Math.max(0, p.opacity);
+                        ctx.fillStyle = p.color;
+                        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                        ctx.restore();
+                    }
+                });
+
+                if (alive) {
+                    animationFrame = requestAnimationFrame(animate);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+            animate();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderInfoList();
+            initGame();
+
+            // Button Click Handlers
+            document.getElementById('btn-check').addEventListener('click', checkAnswers);
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                soundFX.playPop();
+                initGame();
+            });
+            document.getElementById('btn-restart-victory').addEventListener('click', () => {
+                modalVictory.classList.add('hidden');
+                initGame();
+            });
+
+            // Info Modal Triggers
+            document.getElementById('btn-info').addEventListener('click', () => {
+                soundFX.playPop();
+                modalInfo.classList.remove('hidden');
+            });
+
+            document.querySelectorAll('.close-modal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    soundFX.playPop();
+                    modalInfo.classList.add('hidden');
+                });
+            });
+
+            // Window Resize for Canvas Confetti
+            window.addEventListener('resize', () => {
+                const canvas = document.getElementById('confetti-canvas');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        });
+    </script>
+</body>
+</html>
